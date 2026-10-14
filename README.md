@@ -1,4 +1,5 @@
-<<<<<<< HEAD
+# Chiv_Ozgullu_capstone
+
 # Capstone project -- provided material
 
 Read the subject (`sujet_projet_final.pdf`, one level up) first. This folder contains only what
@@ -81,6 +82,3 @@ Do not modify the simulator to hide these faults: your platform must handle them
 * *Spark cannot find the Kafka source*: add
   `--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1` to `spark-submit`.
 * *Java not found*: install a JDK 11 or 17 and make sure `java -version` works in the same terminal.
-=======
-# Chiv_Ozgullu_capstone
->>>>>>> origin/main
