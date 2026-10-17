@@ -1,4 +1,6 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
 from pyspark.sql.functions import col, from_json
 from pyspark.sql.functions import when, to_timestamp, lit
 from pyspark.sql.functions import struct, to_json
@@ -21,6 +23,15 @@ vehicle_schema = StructType([
     StructField("fuel_level_pct", DoubleType(), True),
     StructField("harsh_braking", BooleanType(), True),
     StructField("_corrupt_record", StringType(), True)
+])
+
+# Fleet catalog schema (B.3)
+catalog_schema = StructType([
+    StructField("vehicle_id", StringType(), True),
+    StructField("plate", StringType(), True),
+    StructField("vehicle_type", StringType(), True),
+    StructField("home_region", StringType(), True),
+    StructField("max_payload_kg", DoubleType(), True)
 ])
 
 # Create the Spark session
@@ -110,6 +121,56 @@ deduplicated_events = (
     .dropDuplicatesWithinWatermark(["event_id"])
 )
 
+# Read the fleet catalog from Kafka (B.3)
+catalog_kafka = (
+    spark.read
+    .format("kafka")
+    .option("kafka.bootstrap.servers", "localhost:9092")
+    .option("subscribe", "fleet_catalog")
+    .option("startingOffsets", "earliest")
+    .load()
+)
+
+# Parse catalog JSON messages (B.3)
+catalog = (
+    catalog_kafka
+    .selectExpr(
+        "CAST(value AS STRING) AS value",
+        "timestamp",
+        "offset"
+    )
+    .withColumn("data", from_json(col("value"), catalog_schema))
+    .select("data.*", "timestamp", "offset")
+    .filter(col("vehicle_id").isNotNull())
+    .withColumn(
+        "rn",
+        row_number().over(
+            Window.partitionBy("vehicle_id").orderBy(
+                col("timestamp").desc(),
+                col("offset").desc()
+            )
+        )
+    )
+    .filter(col("rn") == 1)
+    .drop("rn", "timestamp", "offset")
+)
+
+# Enrich events with the fleet catalog (B.3)
+from pyspark.sql.functions import broadcast, coalesce
+
+enriched_events = (
+    deduplicated_events
+    .join(
+        broadcast(catalog),
+        col("data.vehicle_id") == catalog["vehicle_id"],
+        "left"
+    )
+    .withColumn(
+        "region",
+        coalesce(col("home_region"), lit("UNKNOWN"))
+    )
+)
+
 # Prepare invalid messages for the Kafka dead-letter queue
 dlq_messages = invalid_events.select(
     col("key"),
@@ -135,7 +196,8 @@ dlq_query = (
 # Display received messages
 query = (
     # valid_events.writeStream
-    deduplicated_events.select("event_id", "event_timestamp").writeStream
+    # deduplicated_events.select("event_id", "event_timestamp").writeStream
+    enriched_events.writeStream
     .format("console")
     .outputMode("append")
     .option("truncate", "false")
