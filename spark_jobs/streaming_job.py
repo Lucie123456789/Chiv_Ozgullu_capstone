@@ -59,9 +59,18 @@ validated_events = parsed_events.withColumn(
     "reason",
     when(col("data").isNull(), lit("invalid_json"))
     .when(col("data._corrupt_record").isNotNull(), lit("invalid_json"))
-    .when(col("data.event_id").isNull(), lit("missing_event_id"))
-    .when(col("data.vehicle_id").isNull(), lit("missing_vehicle_id"))
-    .when(col("data.event_time").isNull(), lit("missing_event_time"))
+    .when(
+        col("data.event_id").isNull() | (col("data.event_id") == ""),
+        lit("missing_event_id")
+    )
+    .when(
+        col("data.vehicle_id").isNull() | (col("data.vehicle_id") == ""),
+        lit("missing_vehicle_id")
+    )
+    .when(
+        col("data.event_time").isNull() | (col("data.event_time") == ""),
+        lit("missing_event_time")
+    )
     .when(col("data.latitude").isNull(), lit("missing_latitude"))
     .when(col("data.longitude").isNull(), lit("missing_longitude"))
     .when(col("data.speed_kmh").isNull(), lit("missing_speed_kmh"))
