@@ -59,9 +59,18 @@ validated_events = parsed_events.withColumn(
     "reason",
     when(col("data").isNull(), lit("invalid_json"))
     .when(col("data._corrupt_record").isNotNull(), lit("invalid_json"))
-    .when(col("data.event_id").isNull(), lit("missing_event_id"))
-    .when(col("data.vehicle_id").isNull(), lit("missing_vehicle_id"))
-    .when(col("data.event_time").isNull(), lit("missing_event_time"))
+    .when(
+        col("data.event_id").isNull() | (col("data.event_id") == ""),
+        lit("missing_event_id")
+    )
+    .when(
+        col("data.vehicle_id").isNull() | (col("data.vehicle_id") == ""),
+        lit("missing_vehicle_id")
+    )
+    .when(
+        col("data.event_time").isNull() | (col("data.event_time") == ""),
+        lit("missing_event_time")
+    )
     .when(col("data.latitude").isNull(), lit("missing_latitude"))
     .when(col("data.longitude").isNull(), lit("missing_longitude"))
     .when(col("data.speed_kmh").isNull(), lit("missing_speed_kmh"))
@@ -87,6 +96,20 @@ valid_events = validated_events.filter(
     col("reason").isNull()
 )
 
+# Convert event_time to timestamp for deduplication (B.2)
+valid_events = valid_events.withColumn(
+    "event_timestamp",
+    to_timestamp(col("data.event_time"))
+)
+
+# Remove duplicate event IDs with a 2-minute watermark (B.2)
+deduplicated_events = (
+    valid_events
+    .withColumn("event_id", col("data.event_id"))
+    .withWatermark("event_timestamp", "2 minutes")
+    .dropDuplicatesWithinWatermark(["event_id"])
+)
+
 # Prepare invalid messages for the Kafka dead-letter queue
 dlq_messages = invalid_events.select(
     col("key"),
@@ -104,14 +127,15 @@ dlq_query = (
     .format("kafka")
     .option("kafka.bootstrap.servers", "localhost:9092")
     .option("topic", "vehicle_events_dlq")
-    .option("checkpointLocation", "/tmp/fleet_dlq_checkpoint")
+    .option("checkpointLocation", "/app/checkpoints/fleet_dlq")
     .outputMode("append")
     .start()
 )
 
 # Display received messages
 query = (
-    valid_events.writeStream
+    # valid_events.writeStream
+    deduplicated_events.select("event_id", "event_timestamp").writeStream
     .format("console")
     .outputMode("append")
     .option("truncate", "false")
