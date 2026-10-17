@@ -1,5 +1,7 @@
+import os
 from pyspark.sql import SparkSession
 from query1 import start_query1
+from query2 import start_query2
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
 from pyspark.sql.functions import col, from_json
@@ -12,6 +14,8 @@ from pyspark.sql.types import (
     DoubleType,
     BooleanType
 )
+
+BASE_PATH = os.getenv("SPARK_BASE_PATH", ".")
 
 # Expected structure of a vehicle event
 vehicle_schema = StructType([
@@ -189,7 +193,7 @@ dlq_query = (
     .format("kafka")
     .option("kafka.bootstrap.servers", "localhost:9092")
     .option("topic", "vehicle_events_dlq")
-    .option("checkpointLocation", "/app/checkpoints/fleet_dlq")
+    .option("checkpointLocation", f"{BASE_PATH}/checkpoints/fleet_dlq")
     .outputMode("append")
     .start()
 )
@@ -206,4 +210,5 @@ query = (
 )
 
 query1 = start_query1(enriched_events)
+query2 = start_query2(enriched_events)
 query.awaitTermination()
