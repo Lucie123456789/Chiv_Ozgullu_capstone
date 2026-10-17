@@ -1,6 +1,7 @@
-
+import os
 from pyspark.sql.functions import col, to_date, lit, struct, to_json
 
+BASE_PATH = os.getenv("SPARK_BASE_PATH", ".")
 
 def start_query1(enriched_events):
     def process_batch(batch_df, batch_id):
@@ -20,7 +21,7 @@ def start_query1(enriched_events):
             batch.write
             .mode("overwrite")
             .partitionBy("event_date")
-            .parquet(f"/app/output/query1/batch_id={batch_id}")
+            .parquet(f"{BASE_PATH}/output/query1/batch_id={batch_id}")
         )
 
         # Select speeding or harsh braking events
@@ -55,6 +56,6 @@ def start_query1(enriched_events):
         enriched_events.writeStream
         .foreachBatch(process_batch)
         .outputMode("append")
-        .option("checkpointLocation", "/app/checkpoints/query1")
+        .option("checkpointLocation", f"{BASE_PATH}/checkpoints/query1")
         .start()
     )

@@ -4,3 +4,4 @@ __pycache__/
 /output/
 /metastore_db/
 derby.log
+.venv/
