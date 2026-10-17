@@ -104,7 +104,7 @@ dlq_query = (
     .format("kafka")
     .option("kafka.bootstrap.servers", "localhost:9092")
     .option("topic", "vehicle_events_dlq")
-    .option("checkpointLocation", "/tmp/fleet_dlq_checkpoint")
+    .option("checkpointLocation", "/app/checkpoints/fleet_dlq")
     .outputMode("append")
     .start()
 )
