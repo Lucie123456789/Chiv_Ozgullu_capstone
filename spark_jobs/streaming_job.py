@@ -2,6 +2,7 @@ import os
 from pyspark.sql import SparkSession
 from query1 import start_query1
 from query2 import start_query2
+from query3 import start_query3
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
 from pyspark.sql.functions import col, from_json
@@ -211,4 +212,5 @@ query = (
 
 query1 = start_query1(enriched_events)
 query2 = start_query2(enriched_events)
+query3 = start_query3(enriched_events)
 query.awaitTermination()
