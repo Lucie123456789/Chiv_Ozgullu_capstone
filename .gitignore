@@ -1,2 +1,6 @@
 checkpoints/
 __pycache__/
+
+/output/
+/metastore_db/
+derby.log
