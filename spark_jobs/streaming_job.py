@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+from query1 import start_query1
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
 from pyspark.sql.functions import col, from_json
@@ -204,4 +205,5 @@ query = (
     .start()
 )
 
+query1 = start_query1(enriched_events)
 query.awaitTermination()
