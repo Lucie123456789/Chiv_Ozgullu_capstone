@@ -96,6 +96,20 @@ valid_events = validated_events.filter(
     col("reason").isNull()
 )
 
+# Convert event_time to timestamp for deduplication (B.2)
+valid_events = valid_events.withColumn(
+    "event_timestamp",
+    to_timestamp(col("data.event_time"))
+)
+
+# Remove duplicate event IDs with a 2-minute watermark (B.2)
+deduplicated_events = (
+    valid_events
+    .withColumn("event_id", col("data.event_id"))
+    .withWatermark("event_timestamp", "2 minutes")
+    .dropDuplicatesWithinWatermark(["event_id"])
+)
+
 # Prepare invalid messages for the Kafka dead-letter queue
 dlq_messages = invalid_events.select(
     col("key"),
@@ -120,7 +134,8 @@ dlq_query = (
 
 # Display received messages
 query = (
-    valid_events.writeStream
+    # valid_events.writeStream
+    deduplicated_events.select("event_id", "event_timestamp").writeStream
     .format("console")
     .outputMode("append")
     .option("truncate", "false")
